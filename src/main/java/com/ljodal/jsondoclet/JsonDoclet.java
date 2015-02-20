@@ -20,95 +20,99 @@ import com.sun.javadoc.Tag;
 import com.sun.javadoc.ThrowsTag;
 import com.sun.javadoc.Type;
 
+
 /**
  * Doclet implementation for javadoc command.
  * This output is based on JavaScript Object Notation.
+ *
  * @author E.Sekito
  * @since 2014/07/31
  */
 public class JsonDoclet {
-	private String outputDir = ".";
-	private static File file = null;
+    private String outputDir = ".";
+    private static File file = null;
 
-	public static LanguageVersion languageVersion() {
+    public static LanguageVersion languageVersion() {
         return LanguageVersion.JAVA_1_5;
     }
 
-	/**
-	 * Entry point when generating JavaDoc.
-	 *
-	 * @param root The root doc object
-	 */
+    /**
+     * Entry point when generating JavaDoc.
+     *
+     * @param root The root doc object
+     */
     public static boolean start(RootDoc root) {
-    	try {
-			JsonDoclet doclet = new JsonDoclet(root);
-			return true;
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
+        try {
+            JsonDoclet doclet = new JsonDoclet(root);
+            return true;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-	/**
-	 * Private constructor for generating json.
-	 *
-	 * @param root The root doc object
-	 */
+    /**
+     * Private constructor for generating json.
+     *
+     * @param root The root doc object
+     */
     private JsonDoclet(RootDoc root) throws IOException {
-    	// Parse options
-		parseOptions(root.options());
+        // Parse options
+        parseOptions(root.options());
 
-    	// File handlers
-    	OutputStream out = null;
-    	JsonGenerator json = null;
+        // File handlers
+        OutputStream out = null;
+        JsonGenerator json = null;
 
-		// Write each of the classes to its own file
-		for(final ClassDoc classDoc : root.classes()) {
-			File file = new File(this.outputDir, classDoc.qualifiedName() + ".json");
+        // Write each of the classes to its own file
+        for (final ClassDoc classDoc : root.classes()) {
+            File file = new File(this.outputDir, classDoc.qualifiedName() + ".json");
 
-			try {
-				out = new FileOutputStream(file);
-				json = new JsonFactory().createGenerator(out);
+            try {
+                out = new FileOutputStream(file);
+                json = new JsonFactory().createGenerator(out);
 
-				writeClass(json, classDoc);
+                writeClass(json, classDoc);
 
-				json.flush();
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			} finally {
-				if (out != null)
-					out.close();
-				if (json != null)
-					json.close();
-			}
-		}
-	}
+                json.flush();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            } finally {
+                if (out != null)
+                    out.close();
+                if (json != null)
+                    json.close();
+            }
+        }
+    }
 
     public static int optionLength(String option) {
-    	switch(option) {
-			case "-d":
-				return 2;
-			default:
-				return 0;
-		}
+        switch (option) {
+            case "-d":
+                return 2;
+            default:
+                return 0;
+        }
     }
 
-    private void parseOptions(String [][] options) {
-    	for (String [] opt : options) {
-    		switch (opt[0]) {
-				case "-d":
-					outputDir = opt[1];
-					break;
-			}
-		}
-	}
+    private void parseOptions(String[][] options) {
+        for (String[] opt : options) {
+            switch (opt[0]) {
+                case "-d":
+                    outputDir = opt[1];
+                    break;
+            }
+        }
+    }
 
     static void writeClass(JsonGenerator g, ClassDoc doc) throws IOException {
         g.writeStartObject();
 
-        g.writeObjectField("name", doc.qualifiedName()); {
+        // Basic information
+        g.writeObjectField("name", doc.qualifiedName());
+        {
             g.writeArrayFieldStart("interfaces");
 
-            for(final ClassDoc interfaceDoc : doc.interfaces()) {
+            for (final ClassDoc interfaceDoc : doc.interfaces()) {
                 g.writeString(interfaceDoc.qualifiedTypeName());
             }
 
@@ -117,89 +121,84 @@ public class JsonDoclet {
 
         g.writeObjectField("superclass", (doc.superclassType() != null) ? doc.superclassType().qualifiedTypeName() : "");
         g.writeObjectField("comment", doc.commentText());
+
+        // Write since tag
         {
             final Tag tag = get(doc.tags("since"), 0);
 
             g.writeObjectField("since", (tag != null) ? tag.text() : "");
         }
-        {
-            g.writeArrayFieldStart("see");
 
-            for(final SeeTag tag : doc.seeTags())
-            {
-                g.writeString(tag.referencedClassName());
-            }
+        // Write see tags
+        g.writeArrayFieldStart("see");
 
-            g.writeEndArray();
+        for (final SeeTag tag : doc.seeTags()) {
+            g.writeString(tag.referencedClassName());
         }
-        {
-            g.writeArrayFieldStart("constructors");
 
-            for(final ConstructorDoc ctorDoc : doc.constructors())
-            {
-                writeConstructor(g, ctorDoc);
-            }
+        g.writeEndArray();
 
-            g.writeEndArray();
+
+        // Write constructors
+        g.writeArrayFieldStart("constructors");
+
+        for (final ConstructorDoc ctorDoc : doc.constructors()) {
+            writeConstructor(g, ctorDoc);
         }
-        {
-            g.writeArrayFieldStart("fields");
 
-            for(final FieldDoc fieldDoc : doc.fields())
-            {
-                writeField(g, fieldDoc);
-            }
+        g.writeEndArray();
 
-            g.writeEndArray();
+        // Write fields
+        g.writeArrayFieldStart("fields");
+
+        for (final FieldDoc fieldDoc : doc.fields()) {
+            writeField(g, fieldDoc);
         }
-        {
-            g.writeArrayFieldStart("methods");
 
-            for(final MethodDoc methodDoc : doc.methods())
-            {
-                writeMethod(g, methodDoc);
-            }
+        g.writeEndArray();
 
-            g.writeEndArray();
+        // Write methods
+        g.writeArrayFieldStart("methods");
+
+        for (final MethodDoc methodDoc : doc.methods()) {
+            writeMethod(g, methodDoc);
         }
+
+        g.writeEndArray();
 
         g.writeEndObject();
     }
 
     static void writeConstructor(JsonGenerator g, ConstructorDoc doc)
-        throws IOException
-    {
+            throws IOException {
         g.writeStartObject();
 
+        // Basic information
         g.writeObjectField("name", doc.name());
         g.writeObjectField("comment", doc.commentText());
-        {
-            g.writeArrayFieldStart("parameters");
 
-            for(int i = 0; i < doc.parameters().length; ++i)
-            {
-                writeMethodParameter(g, doc.parameters()[i], doc.paramTags());
-            }
+        // Write parameters
+        g.writeArrayFieldStart("parameters");
 
-            g.writeEndArray();
+        for (int i = 0; i < doc.parameters().length; ++i) {
+            writeMethodParameter(g, doc.parameters()[i], doc.paramTags());
         }
-        {
-            g.writeArrayFieldStart("throws");
 
-            for(int i = 0; i < doc.thrownExceptionTypes().length; ++i)
-            {
-                writeThrow(g, doc.thrownExceptionTypes()[i], doc.throwsTags());
-            }
+        g.writeEndArray();
 
-            g.writeEndArray();
+        // Write throws declarations
+        g.writeArrayFieldStart("throws");
+        for (int i = 0; i < doc.thrownExceptionTypes().length; ++i) {
+            writeThrow(g, doc.thrownExceptionTypes()[i], doc.throwsTags());
         }
+
+        g.writeEndArray();
 
         g.writeEndObject();
     }
 
     static void writeThrow(JsonGenerator g, Type type, ThrowsTag[] tags)
-        throws IOException
-    {
+            throws IOException {
         final ThrowsTag tag = find(tags, type);
 
         g.writeStartObject();
@@ -211,8 +210,7 @@ public class JsonDoclet {
     }
 
     static void writeMethodParameter(JsonGenerator g, Parameter parameter, ParamTag[] tags)
-        throws IOException
-    {
+            throws IOException {
         final ParamTag tag = find(tags, parameter);
 
         g.writeStartObject();
@@ -225,8 +223,7 @@ public class JsonDoclet {
     }
 
     static void writeField(JsonGenerator g, FieldDoc doc)
-        throws IOException
-    {
+            throws IOException {
         g.writeStartObject();
 
         g.writeObjectField("name", doc.name());
@@ -237,8 +234,7 @@ public class JsonDoclet {
     }
 
     static void writeMethod(JsonGenerator g, MethodDoc doc)
-        throws IOException
-    {
+            throws IOException {
         g.writeStartObject();
 
         g.writeObjectField("name", doc.name());
@@ -248,8 +244,7 @@ public class JsonDoclet {
         {
             g.writeArrayFieldStart("parameters");
 
-            for(int i = 0; i < doc.parameters().length; ++i)
-            {
+            for (int i = 0; i < doc.parameters().length; ++i) {
                 writeMethodParameter(g, doc.parameters()[i], doc.paramTags());
             }
 
@@ -258,8 +253,7 @@ public class JsonDoclet {
         {
             g.writeArrayFieldStart("throws");
 
-            for(int i = 0; i < doc.thrownExceptions().length; ++i)
-            {
+            for (int i = 0; i < doc.thrownExceptions().length; ++i) {
                 writeThrow(g, doc.thrownExceptionTypes()[i], doc.throwsTags());
             }
 
@@ -278,44 +272,31 @@ public class JsonDoclet {
         g.writeEndObject();
     }
 
-    static <T> T get(T[] elements, int i)
-    {
-        if(i < 0)
-        {
+    static <T> T get(T[] elements, int i) {
+        if (i < 0) {
             throw new IllegalArgumentException();
         }
 
-        if(i < elements.length)
-        {
+        if (i < elements.length) {
             return elements[i];
-        }
-        else
-        {
+        } else {
             return null;
         }
     }
 
-    static ThrowsTag find(ThrowsTag[] tags, Type type)
-    {
-        for(final ThrowsTag tag : tags)
-        {
-            if(type.equals(tag.exceptionType()))
-            {
+    static ThrowsTag find(ThrowsTag[] tags, Type type) {
+        for (final ThrowsTag tag : tags)
+            if (type.equals(tag.exceptionType()))
                 return tag;
-            }
-        }
+
         return null;
     }
 
-    static ParamTag find(ParamTag[] tags, Parameter param)
-    {
-        for(final ParamTag tag : tags)
-        {
-            if(param.name().equals(tag.parameterName()))
-            {
+    static ParamTag find(ParamTag[] tags, Parameter param) {
+        for (final ParamTag tag : tags)
+            if (param.name().equals(tag.parameterName()))
                 return tag;
-            }
-        }
+
         return null;
     }
 }
