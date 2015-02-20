@@ -278,6 +278,15 @@ public class JsonDoclet {
             g.writeEndArray();
         }
 
+        // Check if the method overrides another method
+        ClassDoc overridden = doc.overriddenClass();
+        if (overridden != null) {
+            g.writeObjectFieldStart("overrides");
+            g.writeObjectField("class", overridden.qualifiedName());
+            g.writeObjectField("method", doc.overriddenMethod().name());
+            g.writeEndObject();
+        }
+
         g.writeEndObject();
     }
 
