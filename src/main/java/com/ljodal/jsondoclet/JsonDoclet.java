@@ -102,19 +102,6 @@ public class JsonDoclet {
 		}
 	}
 
-    static void write(JsonGenerator g, RootDoc doc) throws IOException {
-        g.writeStartObject(); {
-            g.writeArrayFieldStart("classes");
-
-            for(final ClassDoc classDoc : doc.classes()) {
-                writeClass(g, classDoc);
-            }
-
-            g.writeEndArray();
-        }
-        g.writeEndObject();
-    }
-
     static void writeClass(JsonGenerator g, ClassDoc doc) throws IOException {
         g.writeStartObject();
 
