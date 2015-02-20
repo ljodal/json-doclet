@@ -116,7 +116,7 @@ public class JsonDoclet {
         }
 
         g.writeObjectField("superclass", (doc.superclassType() != null) ? doc.superclassType().qualifiedTypeName() : "");
-        g.writeObjectField("comment_text", doc.commentText());
+        g.writeObjectField("comment", doc.commentText());
         {
             final Tag tag = get(doc.tags("since"), 0);
 
@@ -172,7 +172,7 @@ public class JsonDoclet {
         g.writeStartObject();
 
         g.writeObjectField("name", doc.name());
-        g.writeObjectField("comment_text", doc.commentText());
+        g.writeObjectField("comment", doc.commentText());
         {
             g.writeArrayFieldStart("parameters");
 
@@ -205,7 +205,7 @@ public class JsonDoclet {
         g.writeStartObject();
 
         g.writeObjectField("name", type.qualifiedTypeName());
-        g.writeObjectField("comment_text", (tag != null) ? tag.exceptionComment() : "");
+        g.writeObjectField("comment", (tag != null) ? tag.exceptionComment() : "");
 
         g.writeEndObject();
     }
@@ -218,7 +218,7 @@ public class JsonDoclet {
         g.writeStartObject();
 
         g.writeObjectField("name", parameter.name());
-        g.writeObjectField("comment_text", (tag != null) ? tag.parameterComment() : "");
+        g.writeObjectField("comment", (tag != null) ? tag.parameterComment() : "");
         g.writeObjectField("type", parameter.type().qualifiedTypeName());
 
         g.writeEndObject();
@@ -230,7 +230,7 @@ public class JsonDoclet {
         g.writeStartObject();
 
         g.writeObjectField("name", doc.name());
-        g.writeObjectField("comment_text", doc.commentText());
+        g.writeObjectField("comment", doc.commentText());
         g.writeObjectField("type", doc.type().qualifiedTypeName());
 
         g.writeEndObject();
@@ -242,8 +242,9 @@ public class JsonDoclet {
         g.writeStartObject();
 
         g.writeObjectField("name", doc.name());
-        g.writeObjectField("comment_text", doc.commentText());
-        g.writeObjectField("return_type", doc.returnType().qualifiedTypeName());
+        g.writeObjectField("comment", doc.commentText());
+        g.writeObjectField("returnType", doc.returnType().qualifiedTypeName());
+
         {
             g.writeArrayFieldStart("parameters");
 
