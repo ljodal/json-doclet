@@ -1,0 +1,84 @@
+buildscript {
+    repositories {
+        maven {
+            url '${artifactory_contextUrl}/plugins-release'
+            credentials {
+                username = "${artifactory_user}"
+                password = "${artifactory_password}"
+            }
+            name = "maven-main-cache"
+        }
+    }
+    dependencies {
+        classpath "org.jfrog.buildinfo:build-info-extractor-gradle:3.0.1"
+    }
+}
+
+plugins {
+    id 'com.jfrog.artifactory' version '3.0.1'
+}
+
+// Enable plugins
+apply plugin: 'java'
+apply plugin: 'maven-publish'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+
+
+// Project config
+sourceCompatibility = 1.7
+version = '0.0.1'
+group = 'com.ljodal'
+
+// Get dependenvies through artifactory
+repositories {
+    maven {
+        url "${artifactory_contextUrl}/libs-release"
+            credentials {
+                username = "${artifactory_user}"
+                password = "${artifactory_password}"
+            }
+        name = "libs-release"
+    }
+}
+
+// dependencies
+dependencies {
+    compile group: 'junit', name: 'junit', version: '4.11'
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '2.4.1.1'
+    compile group: 'org.projectlombok', name: 'lombok', version: '1.14.8'
+    compile files("${System.properties['java.home']}/../lib/tools.jar")
+}
+
+// Use gradle 2.3
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.3'
+}
+
+// Artifactory publishing setup
+artifactory {
+    contextUrl = "${artifactory_contextUrl}"
+    publish {
+        repository {
+            repoKey = 'libs-release-local'
+            username = "${artifactory_user}"
+            password = "${artifactory_password}"
+            maven = true
+
+        }
+
+        defaults {
+            publications ('mavenJava')
+        }
+    }
+}
+
+// Settings for what to publish
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+}
+

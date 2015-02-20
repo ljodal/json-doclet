@@ -1,11 +1,12 @@
-package jp.michikusa.chitose.doclet;
+package com.ljodal.jsondoclet;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.sun.javadoc.ClassDoc;
 import com.sun.javadoc.ConstructorDoc;
 import com.sun.javadoc.FieldDoc;
@@ -25,66 +26,87 @@ import com.sun.javadoc.Type;
  * @author E.Sekito
  * @since 2014/07/31
  */
-public class JsonDoclet
-{
-    public static LanguageVersion languageVersion()
-    {
+public class JsonDoclet {
+	private String outputDir = ".";
+	private static File file = null;
+
+	public static LanguageVersion languageVersion() {
         return LanguageVersion.JAVA_1_5;
     }
 
-    public static boolean start(RootDoc root)
-    {
-        final DocletOption option= new DocletOption(root.options());
-
-        OutputStream ostream= null;
-        JsonGenerator generator= null;
-        try
-        {
-            ostream= option.openOutputStream();
-            generator= new JsonFactory().createGenerator(ostream);
-
-            if(option.isPretty())
-            {
-                generator.setPrettyPrinter(new DefaultPrettyPrinter());
-            }
-
-            write(generator, root);
-
-            generator.flush();
-        }
-        catch(IOException e)
-        {
-            throw new RuntimeException(e);
-        }
-        finally
-        {
-            if(ostream != null)
-            {
-                try{ ostream.close(); } catch(IOException e){ /* TODO */ }
-            }
-            if(generator != null)
-            {
-                try{ generator.close(); } catch(IOException e){ /* TODO */ }
-            }
-        }
-
-        return true;
+	/**
+	 * Entry point when generating JavaDoc.
+	 *
+	 * @param root The root doc object
+	 */
+    public static boolean start(RootDoc root) {
+    	try {
+			JsonDoclet doclet = new JsonDoclet(root);
+			return true;
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
     }
 
-    public static int optionLength(String option)
-    {
-        return DocletOption.getOptionLength(option);
+	/**
+	 * Private constructor for generating json.
+	 *
+	 * @param root The root doc object
+	 */
+    private JsonDoclet(RootDoc root) throws IOException {
+    	// Parse options
+		parseOptions(root.options());
+
+    	// File handlers
+    	OutputStream out = null;
+    	JsonGenerator json = null;
+
+		// Write each of the classes to its own file
+		for(final ClassDoc classDoc : root.classes()) {
+			File file = new File(this.outputDir, classDoc.qualifiedName() + ".json");
+
+			try {
+				out = new FileOutputStream(file);
+				json = new JsonFactory().createGenerator(out);
+
+				writeClass(json, classDoc);
+
+				json.flush();
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			} finally {
+				if (out != null)
+					out.close();
+				if (json != null)
+					json.close();
+			}
+		}
+	}
+
+    public static int optionLength(String option) {
+    	switch(option) {
+			case "-d":
+				return 2;
+			default:
+				return 0;
+		}
     }
 
-    static void write(JsonGenerator g, RootDoc doc)
-        throws IOException
-    {
-        g.writeStartObject();
-        {
+    private void parseOptions(String [][] options) {
+    	for (String [] opt : options) {
+    		switch (opt[0]) {
+				case "-d":
+					outputDir = opt[1];
+					break;
+			}
+		}
+	}
+
+    static void write(JsonGenerator g, RootDoc doc) throws IOException {
+        g.writeStartObject(); {
             g.writeArrayFieldStart("classes");
 
-            for(final ClassDoc classDoc : doc.classes())
-            {
+            for(final ClassDoc classDoc : doc.classes()) {
                 writeClass(g, classDoc);
             }
 
@@ -93,22 +115,19 @@ public class JsonDoclet
         g.writeEndObject();
     }
 
-    static void writeClass(JsonGenerator g, ClassDoc doc)
-        throws IOException
-    {
+    static void writeClass(JsonGenerator g, ClassDoc doc) throws IOException {
         g.writeStartObject();
 
-        g.writeObjectField("name", doc.qualifiedName());
-        {
+        g.writeObjectField("name", doc.qualifiedName()); {
             g.writeArrayFieldStart("interfaces");
 
-            for(final ClassDoc interfaceDoc : doc.interfaces())
-            {
+            for(final ClassDoc interfaceDoc : doc.interfaces()) {
                 g.writeString(interfaceDoc.qualifiedTypeName());
             }
 
             g.writeEndArray();
         }
+
         g.writeObjectField("superclass", (doc.superclassType() != null) ? doc.superclassType().qualifiedTypeName() : "");
         g.writeObjectField("comment_text", doc.commentText());
         {
