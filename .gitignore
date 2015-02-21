@@ -7,3 +7,7 @@ gradle.properties
 *.iml
 *.ipr
 *.iws
+out
+
+# Mac OS X files
+.DS_Store
