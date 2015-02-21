@@ -26,7 +26,7 @@ apply plugin: 'idea'
 
 
 // Project config
-sourceCompatibility = 1.7
+sourceCompatibility = 1.8
 group = 'com.ljodal'
 version = '0.0.1-SNAPSHOT'
 

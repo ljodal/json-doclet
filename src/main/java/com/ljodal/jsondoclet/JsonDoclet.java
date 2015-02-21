@@ -7,18 +7,7 @@ import java.io.OutputStream;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
-import com.sun.javadoc.ClassDoc;
-import com.sun.javadoc.ConstructorDoc;
-import com.sun.javadoc.FieldDoc;
-import com.sun.javadoc.LanguageVersion;
-import com.sun.javadoc.MethodDoc;
-import com.sun.javadoc.ParamTag;
-import com.sun.javadoc.Parameter;
-import com.sun.javadoc.RootDoc;
-import com.sun.javadoc.SeeTag;
-import com.sun.javadoc.Tag;
-import com.sun.javadoc.ThrowsTag;
-import com.sun.javadoc.Type;
+import com.sun.javadoc.*;
 
 
 /**
@@ -51,7 +40,7 @@ public class JsonDoclet {
      *
      * @param root The root doc object
      */
-    private JsonDoclet(RootDoc root) throws IOException {
+    private JsonDoclet(RootDoc root) {
         // Parse options
         parseOptions(root.options());
 
@@ -113,63 +102,66 @@ public class JsonDoclet {
     static void writeClass(JsonGenerator g, ClassDoc doc) throws IOException {
         g.writeStartObject();
 
-        // Basic information
-        g.writeObjectField("name", doc.qualifiedName());
-        {
-            g.writeArrayFieldStart("interfaces");
+        // Write class basics, like package, name, and generics information
+        writeTypeBasics(g, doc);
 
-            for (final ClassDoc interfaceDoc : doc.interfaces()) {
-                g.writeString(interfaceDoc.qualifiedTypeName());
-            }
 
-            g.writeEndArray();
-        }
-
-        g.writeObjectField("superclass", (doc.superclassType() != null) ? doc.superclassType().qualifiedTypeName() : "");
         g.writeObjectField("comment", doc.commentText());
+
+        g.writeArrayFieldStart("modifiers");
+        for (String s : doc.modifiers().split(" ")) {
+            g.writeString(s);
+        }
+        g.writeEndArray();
+
+        // Superclass
+        g.writeObjectFieldStart("extends");
+        writeTypeBasics(g, doc.superclassType());
+        g.writeEndObject();
+
+        // Interfaces
+        g.writeArrayFieldStart("interfaces");
+        for (final Type interfaceDoc : doc.interfaceTypes()) {
+            g.writeStartObject();
+            writeTypeBasics(g, interfaceDoc);
+            g.writeEndObject();
+        }
+        g.writeEndArray();
+
 
         // Write since tag
         {
             final Tag tag = get(doc.tags("since"), 0);
-
             g.writeObjectField("since", (tag != null) ? tag.text() : "");
         }
 
         // Write see tags
         g.writeArrayFieldStart("see");
-
         for (final SeeTag tag : doc.seeTags()) {
             g.writeString(tag.referencedClassName());
         }
-
         g.writeEndArray();
 
 
         // Write constructors
         g.writeArrayFieldStart("constructors");
-
         for (final ConstructorDoc ctorDoc : doc.constructors()) {
             writeConstructor(g, ctorDoc);
         }
-
         g.writeEndArray();
 
         // Write fields
         g.writeArrayFieldStart("fields");
-
         for (final FieldDoc fieldDoc : doc.fields()) {
             writeField(g, fieldDoc);
         }
-
         g.writeEndArray();
 
         // Write methods
         g.writeArrayFieldStart("methods");
-
-        for (final MethodDoc methodDoc : doc.methods()) {
+        for (final MethodDoc methodDoc : doc.methods(false)) {
             writeMethod(g, methodDoc);
         }
-
         g.writeEndArray();
 
         g.writeEndObject();
@@ -185,11 +177,9 @@ public class JsonDoclet {
 
         // Write parameters
         g.writeArrayFieldStart("parameters");
-
         for (int i = 0; i < doc.parameters().length; ++i) {
             writeMethodParameter(g, doc.parameters()[i], doc.paramTags());
         }
-
         g.writeEndArray();
 
         // Write throws declarations
@@ -197,7 +187,6 @@ public class JsonDoclet {
         for (int i = 0; i < doc.thrownExceptionTypes().length; ++i) {
             writeThrow(g, doc.thrownExceptionTypes()[i], doc.throwsTags());
         }
-
         g.writeEndArray();
 
         g.writeEndObject();
@@ -209,8 +198,9 @@ public class JsonDoclet {
 
         g.writeStartObject();
 
-        g.writeObjectField("name", type.qualifiedTypeName());
         g.writeObjectField("comment", (tag != null) ? tag.exceptionComment() : "");
+
+        writeTypeBasics(g, type);
 
         g.writeEndObject();
     }
@@ -221,9 +211,10 @@ public class JsonDoclet {
 
         g.writeStartObject();
 
-        g.writeObjectField("name", parameter.name());
+        g.writeObjectField("parameter", parameter.name());
         g.writeObjectField("comment", (tag != null) ? tag.parameterComment() : "");
-        g.writeObjectField("type", parameter.type().qualifiedTypeName());
+
+        writeTypeBasics(g, parameter.type());
 
         g.writeEndObject();
     }
@@ -232,9 +223,10 @@ public class JsonDoclet {
             throws IOException {
         g.writeStartObject();
 
-        g.writeObjectField("name", doc.name());
+        g.writeObjectField("field", doc.name());
         g.writeObjectField("comment", doc.commentText());
-        g.writeObjectField("type", doc.type().qualifiedTypeName());
+
+        writeTypeBasics(g, doc.type());
 
         g.writeEndObject();
     }
@@ -243,39 +235,204 @@ public class JsonDoclet {
             throws IOException {
         g.writeStartObject();
 
+        // Write basic information
         g.writeObjectField("name", doc.name());
         g.writeObjectField("comment", doc.commentText());
-        g.writeObjectField("returnType", doc.returnType().qualifiedTypeName());
+        g.writeObjectField("varargs", doc.isVarArgs());
 
-        {
-            g.writeArrayFieldStart("parameters");
+        // Write return type
+        g.writeObjectFieldStart("return");
+        writeTypeBasics(g, doc.returnType());
+        g.writeEndObject();
 
-            for (int i = 0; i < doc.parameters().length; ++i) {
-                writeMethodParameter(g, doc.parameters()[i], doc.paramTags());
-            }
 
-            g.writeEndArray();
+        // Write parameters
+        g.writeArrayFieldStart("parameters");
+        for (Parameter p : doc.parameters())
+            writeMethodParameter(g, p, doc.paramTags());
+        g.writeEndArray();
+
+        // Write throws declarations
+        g.writeArrayFieldStart("throws");
+        for (int i = 0; i < doc.thrownExceptions().length; ++i) {
+            writeThrow(g, doc.thrownExceptionTypes()[i], doc.throwsTags());
         }
-        {
-            g.writeArrayFieldStart("throws");
+        g.writeEndArray();
 
-            for (int i = 0; i < doc.thrownExceptions().length; ++i) {
-                writeThrow(g, doc.thrownExceptionTypes()[i], doc.throwsTags());
-            }
-
-            g.writeEndArray();
-        }
 
         // Check if the method overrides another method
         ClassDoc overridden = doc.overriddenClass();
         if (overridden != null) {
             g.writeObjectFieldStart("overrides");
-            g.writeObjectField("class", overridden.qualifiedName());
+            g.writeObjectFieldStart("class");
+            writeClassBasics(g, overridden);
+            g.writeEndObject();
             g.writeObjectField("method", doc.overriddenMethod().name());
             g.writeEndObject();
         }
 
         g.writeEndObject();
+    }
+
+    static void writeTypeBasics(JsonGenerator g, Type t)
+            throws IOException {
+
+        if (t == null)
+            return;
+
+        // Common properties
+        g.writeObjectField("dimension", t.dimension());
+
+        // If it's a primitive, skipp all other checks
+        if (t.isPrimitive()) {
+            g.writeObjectField("type", t.typeName());
+            return;
+        }
+
+        // Type name
+        g.writeObjectField("name", t.typeName());
+
+        if (writeAnnotatedType(g, t.asAnnotatedType()))
+            return;
+
+        if (writeAnnotationType(g, t.asAnnotationTypeDoc()))
+            return;
+
+        if (writeParametrizedType(g, t.asParameterizedType()))
+            return;
+
+        if (writeWildcardType(g, t.asWildcardType()))
+            return;
+
+        if (writeTypeVariable(g, t.asTypeVariable()))
+            return;
+
+        if (writeClassBasics(g, t.asClassDoc()))
+            return;
+
+        throw new IllegalArgumentException("Unsupported type: " + t);
+    }
+
+    static boolean writeParametrizedType(JsonGenerator g, ParameterizedType t)
+            throws IOException {
+        if (t == null)
+            return false;
+
+        writeClassBasics(g, t.asClassDoc(), false);
+
+        // Write generics parameters
+        g.writeArrayFieldStart("genericTypes");
+        for (Type type : t.typeArguments()) {
+            g.writeStartObject();
+            writeTypeBasics(g, type);
+            g.writeEndObject();
+        }
+        g.writeEndArray();
+
+        return true;
+    }
+
+    static boolean writeWildcardType(JsonGenerator g, WildcardType t)
+            throws IOException {
+        if (t == null)
+            return false;
+
+        g.writeObjectField("type", "wildcard");
+
+        g.writeArrayFieldStart("extendsBounds");
+        for (Type type : t.extendsBounds()) {
+            g.writeStartObject();
+            writeTypeBasics(g, type);
+            g.writeEndObject();
+        }
+        g.writeEndArray();
+
+        g.writeArrayFieldStart("superBounds");
+        for (Type type : t.superBounds()) {
+            g.writeStartObject();
+            writeTypeBasics(g, type);
+            g.writeEndObject();
+        }
+        g.writeEndArray();
+
+        return true;
+    }
+
+    static boolean writeTypeVariable(JsonGenerator g, TypeVariable v)
+            throws IOException {
+        if (v == null)
+            return false;
+
+        g.writeObjectField("type", "generic");
+        g.writeArrayFieldStart("bounds");
+        for (Type t : v.bounds()) {
+            g.writeStartObject();
+            writeTypeBasics(g, t);
+            g.writeEndObject();
+        }
+        g.writeEndArray();
+
+        return true;
+    }
+
+    static boolean writeAnnotatedType(JsonGenerator g, AnnotatedType t)
+            throws IOException {
+
+        if (t == null)
+            return false;
+
+        g.writeObjectField("type", "annotation");
+
+        throw new UnsupportedOperationException("Annotation type not supported yet: " + t);
+    }
+
+    static boolean writeAnnotationType(JsonGenerator g, AnnotationTypeDoc d)
+    throws IOException {
+        if (d == null)
+            return false;
+
+        throw new UnsupportedOperationException("");
+    }
+
+    static boolean writeClassBasics(JsonGenerator g, ClassDoc c)
+            throws IOException{
+        return writeClassBasics(g, c, true);
+    }
+
+    static boolean writeClassBasics(JsonGenerator g, ClassDoc c, boolean generics)
+            throws IOException {
+        if (c == null)
+            return false;
+
+        if (c.isInterface()) {
+            g.writeObjectField("type", "interface");
+        } else if (c.isEnum()) {
+            g.writeObjectField("type", "enum");
+        } else if (c.isException()) {
+            g.writeObjectField("type", "exception");
+        } else if (c.isError()) {
+            g.writeObjectField("type", "error");
+        } else if (c.isOrdinaryClass()) {
+            g.writeObjectField("type", "class");
+        } else {
+            throw new IllegalArgumentException("Unsupported class: " + c);
+        }
+
+        // Write package
+        g.writeObjectField("package", c.containingPackage().name());
+
+        if (generics) {
+            // Write generics parameters
+            g.writeArrayFieldStart("genericTypes");
+            for (TypeVariable t : c.typeParameters()) {
+                g.writeStartObject();
+                writeTypeBasics(g, t);
+                g.writeEndObject();
+            }
+            g.writeEndArray();
+        }
+
+        return true;
     }
 
     static <T> T get(T[] elements, int i) {
@@ -304,5 +461,10 @@ public class JsonDoclet {
                 return tag;
 
         return null;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return super.equals(obj);
     }
 }
