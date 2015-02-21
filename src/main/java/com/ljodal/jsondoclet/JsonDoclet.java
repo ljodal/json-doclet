@@ -42,12 +42,8 @@ public class JsonDoclet {
      * @param root The root doc object
      */
     public static boolean start(RootDoc root) {
-        try {
-            JsonDoclet doclet = new JsonDoclet(root);
-            return true;
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        new JsonDoclet(root);
+        return true;
     }
 
     /**
@@ -77,10 +73,20 @@ public class JsonDoclet {
             } catch (IOException e) {
                 throw new RuntimeException(e);
             } finally {
-                if (out != null)
-                    out.close();
-                if (json != null)
-                    json.close();
+                try {
+                    if (out != null)
+                        out.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                try {
+                    if (json != null && !json.isClosed())
+                        json.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    ;
+                }
             }
         }
     }
