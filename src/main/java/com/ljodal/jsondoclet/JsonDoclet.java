@@ -114,10 +114,12 @@ public class JsonDoclet {
         }
         g.writeEndArray();
 
-        // Superclass
-        g.writeObjectFieldStart("extends");
-        writeTypeBasics(g, doc.superclassType());
-        g.writeEndObject();
+        // Superclass, unless this is an enum
+        if (!doc.isEnum()) {
+            g.writeObjectFieldStart("extends");
+            writeTypeBasics(g, doc.superclassType());
+            g.writeEndObject();
+        }
 
         // Interfaces
         g.writeArrayFieldStart("interfaces");
@@ -163,6 +165,15 @@ public class JsonDoclet {
             writeMethod(g, methodDoc);
         }
         g.writeEndArray();
+
+        // Write enum fields, if this is an enum
+        if (doc.isEnum()) {
+            g.writeArrayFieldStart("enumConstants");
+            for (final FieldDoc field : doc.enumConstants()) {
+                writeField(g, field);
+            }
+            g.writeEndArray();
+        }
 
         g.writeEndObject();
     }
@@ -226,7 +237,11 @@ public class JsonDoclet {
         g.writeObjectField("field", doc.name());
         g.writeObjectField("comment", doc.commentText());
 
-        writeTypeBasics(g, doc.type());
+        // Only write type information if this is not an
+        // enum constant
+        if (!doc.isEnumConstant()) {
+            writeTypeBasics(g, doc.type());
+        }
 
         g.writeEndObject();
     }
@@ -421,6 +436,7 @@ public class JsonDoclet {
         // Write package
         g.writeObjectField("package", c.containingPackage().name());
 
+        // Only write generics if we are asked to
         if (generics) {
             // Write generics parameters
             g.writeArrayFieldStart("genericTypes");
