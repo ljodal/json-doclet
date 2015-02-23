@@ -5,6 +5,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 
 import com.fasterxml.jackson.core.JsonFactory;
@@ -58,16 +59,23 @@ public class JsonDoclet {
         OutputStream out = null;
         JsonGenerator json = null;
 
-        // Write each of the classes to its own file
-        for (final ClassDoc classDoc : root.classes()) {
-            File file = new File(this.outputDir, classDoc.qualifiedName() + ".json");
+        // HashSet of packages
+        HashSet<PackageDoc> packages = new HashSet<>();
+
+        // Find packages
+        for (final ClassDoc cls : root.classes())
+            packages.add(cls.containingPackage());
+
+        // Write each package to its own file
+        for (final PackageDoc pkg : packages) {
+            File file = new File(this.outputDir, pkg.name() + ".json");
 
             try {
                 out = new FileOutputStream(file);
                 json = new JsonFactory().createGenerator(out);
 
                 json.writeStartObject();
-                writeClass(json, classDoc);
+                writePackage(json, pkg);
                 json.writeEndObject();
 
                 json.flush();
