@@ -28,7 +28,7 @@ apply plugin: 'idea'
 // Project config
 sourceCompatibility = 1.8
 group = 'com.ljodal'
-version = '0.0.1-SNAPSHOT'
+version = '0.0.1'
 
 // Get dependenvies through artifactory
 repositories {
@@ -62,7 +62,7 @@ artifactory {
     contextUrl = "${artifactory_contextUrl}"
     publish {
         repository {
-            repoKey = 'libs-snapshot-local'
+            repoKey = 'libs-release-local'
             username = "${artifactory_user}"
             password = "${artifactory_password}"
             maven = true
