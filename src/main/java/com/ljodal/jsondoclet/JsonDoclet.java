@@ -242,11 +242,8 @@ public class JsonDoclet {
     static void writeMethod(JsonGenerator g, MethodDoc doc)
             throws IOException {
 
-        // Write doc basics
-        writeDoc(g, doc);
-
         // Write program element basics
-        writeProgramElement(g, doc);
+        writeExecutableMember(g, doc);
 
         // Write return type
         g.writeObjectFieldStart("return");
@@ -351,7 +348,6 @@ public class JsonDoclet {
 
         // Write member basics
         writeMember(g, doc);
-
 
         // Write parameters
         g.writeArrayFieldStart("parameters");
