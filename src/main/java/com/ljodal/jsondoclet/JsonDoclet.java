@@ -492,8 +492,7 @@ public class JsonDoclet {
         g.writeArrayFieldStart("elements");
         for (final AnnotationTypeElementDoc e : a.elements()) {
             g.writeStartObject();
-            g.writeObjectField("name", e.name());
-            g.writeObjectField("defaultValue", e.defaultValue().toString());
+            writeAnnotationTypeElement(g, e);
             g.writeEndObject();
         }
         g.writeEndArray();
