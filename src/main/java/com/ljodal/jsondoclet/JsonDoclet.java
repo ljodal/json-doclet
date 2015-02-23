@@ -66,7 +66,9 @@ public class JsonDoclet {
                 out = new FileOutputStream(file);
                 json = new JsonFactory().createGenerator(out);
 
+                json.writeStartObject();
                 writeClass(json, classDoc);
+                json.writeEndObject();
 
                 json.flush();
             } catch (IOException e) {
@@ -108,8 +110,23 @@ public class JsonDoclet {
         }
     }
 
+    static void writePackage(JsonGenerator g, PackageDoc pkg) throws IOException {
+
+        // Write package information
+        writeDoc(g, pkg);
+
+        // Write all classed
+        g.writeObjectFieldStart("classes");
+        for (final ClassDoc c : pkg.allClasses()) {
+            g.writeObjectFieldStart(c.name());
+            writeClass(g, c);
+            g.writeEndObject();
+        }
+        g.writeEndObject();
+
+    }
+
     static void writeClass(JsonGenerator g, ClassDoc doc) throws IOException {
-        g.writeStartObject();
 
         // Write class basics, like package, name, and generics information
         writeTypeBasics(g, doc);
@@ -137,14 +154,18 @@ public class JsonDoclet {
         // Write constructors
         g.writeArrayFieldStart("constructors");
         for (final ConstructorDoc ctorDoc : doc.constructors()) {
+            g.writeStartObject();
             writeConstructor(g, ctorDoc);
+            g.writeEndObject();
         }
         g.writeEndArray();
 
         // Write fields
         g.writeArrayFieldStart("fields");
         for (final FieldDoc fieldDoc : doc.fields()) {
+            g.writeStartObject();
             writeField(g, fieldDoc);
+            g.writeEndObject();
         }
         g.writeEndArray();
 
@@ -161,7 +182,9 @@ public class JsonDoclet {
         if (doc.isEnum()) {
             g.writeArrayFieldStart("enumConstants");
             for (final FieldDoc field : doc.enumConstants()) {
+                g.writeStartObject();
                 writeField(g, field);
+                g.writeEndObject();
             }
             g.writeEndArray();
         }
@@ -176,38 +199,26 @@ public class JsonDoclet {
             }
             g.writeEndArray();
         }
-
-        g.writeEndObject();
     }
 
     static void writeConstructor(JsonGenerator g, ConstructorDoc doc)
             throws IOException {
-        g.writeStartObject();
-
         // Write executable member basics
         writeExecutableMember(g, doc);
-
-        g.writeEndObject();
     }
 
     static void writeThrow(JsonGenerator g, Type type, ThrowsTag[] tags)
             throws IOException {
         final ThrowsTag tag = find(tags, type);
 
-        g.writeStartObject();
-
         g.writeObjectField("comment", (tag != null) ? tag.exceptionComment() : "");
 
         writeTypeBasics(g, type);
-
-        g.writeEndObject();
     }
 
     static void writeMethodParameter(JsonGenerator g, Parameter parameter, ParamTag[] tags)
             throws IOException {
         final ParamTag tag = find(tags, parameter);
-
-        g.writeStartObject();
 
         g.writeObjectField("parameter", parameter.name());
         g.writeObjectField("comment", (tag != null) ? tag.parameterComment() : "");
@@ -216,17 +227,16 @@ public class JsonDoclet {
 
         // Annotations
         g.writeArrayFieldStart("annotations");
-        for (final AnnotationDesc a : parameter.annotations())
+        for (final AnnotationDesc a : parameter.annotations()) {
+            g.writeStartObject();
             writeAnnotationDesc(g, a);
+            g.writeEndObject();
+        }
         g.writeEndArray();
-
-        g.writeEndObject();
     }
 
     static void writeField(JsonGenerator g, FieldDoc doc)
             throws IOException {
-        g.writeStartObject();
-
         // Write doc basics
         writeMember(g, doc);
 
@@ -235,8 +245,6 @@ public class JsonDoclet {
         if (!doc.isEnumConstant()) {
             writeTypeBasics(g, doc.type());
         }
-
-        g.writeEndObject();
     }
 
     static void writeMethod(JsonGenerator g, MethodDoc doc)
@@ -315,8 +323,11 @@ public class JsonDoclet {
 
         // Annotations
         g.writeArrayFieldStart("annotations");
-        for (final AnnotationDesc a : doc.annotations())
+        for (final AnnotationDesc a : doc.annotations()) {
+            g.writeStartObject();
             writeAnnotationDesc(g, a);
+            g.writeEndObject();
+        }
         g.writeEndArray();
 
         // Write package
@@ -351,14 +362,19 @@ public class JsonDoclet {
 
         // Write parameters
         g.writeArrayFieldStart("parameters");
-        for (final Parameter p : doc.parameters())
+        for (final Parameter p : doc.parameters()) {
+            g.writeStartObject();
             writeMethodParameter(g, p, doc.paramTags());
+            g.writeEndObject();
+        }
         g.writeEndArray();
 
         // Write throws declarations
         g.writeArrayFieldStart("throws");
         for (final Type t : doc.thrownExceptionTypes()) {
+            g.writeStartObject();
             writeThrow(g, t, doc.throwsTags());
+            g.writeEndObject();
         }
         g.writeEndArray();
 
@@ -546,8 +562,6 @@ public class JsonDoclet {
 
     static void writeAnnotationDesc(JsonGenerator g, AnnotationDesc a)
             throws IOException {
-        g.writeStartObject();
-
         final AnnotationTypeDoc t = a.annotationType();
 
         // Annotation information
@@ -564,8 +578,6 @@ public class JsonDoclet {
             g.writeEndObject();
         }
         g.writeEndArray();
-
-        g.writeEndObject();
     }
 
     static <T> T get(T[] elements, int i) {
