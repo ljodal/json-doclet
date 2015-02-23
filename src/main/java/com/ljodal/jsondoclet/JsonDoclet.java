@@ -382,7 +382,7 @@ public class JsonDoclet {
         }
 
         // Type name
-        g.writeObjectField("class", t.typeName());
+        g.writeObjectField("typeName", t.typeName());
 
         if (writeAnnotationType(g, t.asAnnotationTypeDoc()))
             return;
