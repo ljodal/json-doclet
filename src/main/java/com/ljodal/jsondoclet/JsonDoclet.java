@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Arrays;
+import java.util.List;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -20,6 +22,14 @@ import com.sun.javadoc.*;
 public class JsonDoclet {
     private String outputDir = ".";
     private static File file = null;
+
+    private static final List<String> ignoredTags = Arrays.asList(
+            "@see",
+            "@since",
+            "@param",
+            "@throws", "@exception",
+            "@return"
+    );
 
     public static LanguageVersion languageVersion() {
         return LanguageVersion.JAVA_1_5;
@@ -74,7 +84,6 @@ public class JsonDoclet {
                         json.close();
                 } catch (IOException e) {
                     e.printStackTrace();
-                    ;
                 }
             }
         }
@@ -105,14 +114,9 @@ public class JsonDoclet {
         // Write class basics, like package, name, and generics information
         writeTypeBasics(g, doc);
 
+        // Write program element basics
+        writeProgramElement(g, doc);
 
-        g.writeObjectField("comment", doc.commentText());
-
-        g.writeArrayFieldStart("modifiers");
-        for (String s : doc.modifiers().split(" ")) {
-            g.writeString(s);
-        }
-        g.writeEndArray();
 
         // Superclass, unless this is an enum
         if (!doc.isEnum()) {
@@ -129,21 +133,6 @@ public class JsonDoclet {
             g.writeEndObject();
         }
         g.writeEndArray();
-
-
-        // Write since tag
-        {
-            final Tag tag = get(doc.tags("since"), 0);
-            g.writeObjectField("since", (tag != null) ? tag.text() : "");
-        }
-
-        // Write see tags
-        g.writeArrayFieldStart("see");
-        for (final SeeTag tag : doc.seeTags()) {
-            g.writeString(tag.referencedClassName());
-        }
-        g.writeEndArray();
-
 
         // Write constructors
         g.writeArrayFieldStart("constructors");
@@ -162,7 +151,9 @@ public class JsonDoclet {
         // Write methods
         g.writeArrayFieldStart("methods");
         for (final MethodDoc methodDoc : doc.methods(false)) {
+            g.writeStartObject();
             writeMethod(g, methodDoc);
+            g.writeEndObject();
         }
         g.writeEndArray();
 
@@ -175,6 +166,17 @@ public class JsonDoclet {
             g.writeEndArray();
         }
 
+        if (doc instanceof AnnotationTypeDoc) {
+            g.writeArrayFieldStart("elements");
+            for (final AnnotationTypeElementDoc e :
+                    ((AnnotationTypeDoc) doc).elements()) {
+                g.writeStartObject();
+                writeAnnotationTypeElement(g, e);
+                g.writeEndObject();
+            }
+            g.writeEndArray();
+        }
+
         g.writeEndObject();
     }
 
@@ -182,23 +184,8 @@ public class JsonDoclet {
             throws IOException {
         g.writeStartObject();
 
-        // Basic information
-        g.writeObjectField("name", doc.name());
-        g.writeObjectField("comment", doc.commentText());
-
-        // Write parameters
-        g.writeArrayFieldStart("parameters");
-        for (int i = 0; i < doc.parameters().length; ++i) {
-            writeMethodParameter(g, doc.parameters()[i], doc.paramTags());
-        }
-        g.writeEndArray();
-
-        // Write throws declarations
-        g.writeArrayFieldStart("throws");
-        for (int i = 0; i < doc.thrownExceptionTypes().length; ++i) {
-            writeThrow(g, doc.thrownExceptionTypes()[i], doc.throwsTags());
-        }
-        g.writeEndArray();
+        // Write executable member basics
+        writeExecutableMember(g, doc);
 
         g.writeEndObject();
     }
@@ -227,6 +214,12 @@ public class JsonDoclet {
 
         writeTypeBasics(g, parameter.type());
 
+        // Annotations
+        g.writeArrayFieldStart("annotations");
+        for (final AnnotationDesc a : parameter.annotations())
+            writeAnnotationDesc(g, a);
+        g.writeEndArray();
+
         g.writeEndObject();
     }
 
@@ -234,8 +227,8 @@ public class JsonDoclet {
             throws IOException {
         g.writeStartObject();
 
-        g.writeObjectField("field", doc.name());
-        g.writeObjectField("comment", doc.commentText());
+        // Write doc basics
+        writeMember(g, doc);
 
         // Only write type information if this is not an
         // enum constant
@@ -248,32 +241,17 @@ public class JsonDoclet {
 
     static void writeMethod(JsonGenerator g, MethodDoc doc)
             throws IOException {
-        g.writeStartObject();
 
-        // Write basic information
-        g.writeObjectField("name", doc.name());
-        g.writeObjectField("comment", doc.commentText());
-        g.writeObjectField("varargs", doc.isVarArgs());
+        // Write doc basics
+        writeDoc(g, doc);
+
+        // Write program element basics
+        writeProgramElement(g, doc);
 
         // Write return type
         g.writeObjectFieldStart("return");
         writeTypeBasics(g, doc.returnType());
         g.writeEndObject();
-
-
-        // Write parameters
-        g.writeArrayFieldStart("parameters");
-        for (Parameter p : doc.parameters())
-            writeMethodParameter(g, p, doc.paramTags());
-        g.writeEndArray();
-
-        // Write throws declarations
-        g.writeArrayFieldStart("throws");
-        for (int i = 0; i < doc.thrownExceptions().length; ++i) {
-            writeThrow(g, doc.thrownExceptionTypes()[i], doc.throwsTags());
-        }
-        g.writeEndArray();
-
 
         // Check if the method overrides another method
         ClassDoc overridden = doc.overriddenClass();
@@ -285,8 +263,111 @@ public class JsonDoclet {
             g.writeObjectField("method", doc.overriddenMethod().name());
             g.writeEndObject();
         }
+    }
 
-        g.writeEndObject();
+    static void writeAnnotationTypeElement(JsonGenerator g, AnnotationTypeElementDoc doc)
+            throws IOException {
+
+        writeMethod(g, doc);
+
+        g.writeObjectField("defaultValue", doc.defaultValue().value());
+    }
+
+    static void writeDoc(JsonGenerator g, Doc doc)
+            throws IOException {
+
+        // Common properties
+        g.writeObjectField("name", doc.name());
+        g.writeObjectField("comment", doc.commentText());
+
+        // Write see tags
+        g.writeArrayFieldStart("see");
+        for (final SeeTag tag : doc.seeTags()) {
+            g.writeString(tag.referencedClassName());
+        }
+        g.writeEndArray();
+
+        // Write since tag
+        {
+            final Tag tag = get(doc.tags("since"), 0);
+            g.writeObjectField("since", (tag != null) ? tag.text() : "");
+        }
+
+        // Other tags
+        g.writeArrayFieldStart("tags");
+        for (final Tag t : doc.tags()) {
+            String kind = t.kind();
+            if (ignoredTags.contains(kind)) {
+                continue;
+            }
+
+            // Write tag name and value
+            g.writeStartObject();
+            g.writeObjectField("name", t.kind());
+            g.writeObjectField("value", t.text());
+            g.writeEndObject();
+        }
+        g.writeEndArray();
+    }
+
+    static void writeProgramElement(JsonGenerator g, ProgramElementDoc doc)
+            throws IOException {
+
+        // Write doc basics, like name, comment, and tags
+        writeDoc(g, doc);
+
+        // Annotations
+        g.writeArrayFieldStart("annotations");
+        for (final AnnotationDesc a : doc.annotations())
+            writeAnnotationDesc(g, a);
+        g.writeEndArray();
+
+        // Write package
+        g.writeObjectField("package", doc.containingPackage().name());
+
+        // Write modifiers
+        // TODO: Write boolean fields?
+        g.writeArrayFieldStart("modifiers");
+        for (String s : doc.modifiers().split(" ")) {
+            g.writeString(s);
+        }
+        g.writeEndArray();
+
+        // TODO: Containing class
+    }
+
+    static void writeMember(JsonGenerator g, MemberDoc doc)
+            throws IOException {
+
+        // Write program element basics
+        writeProgramElement(g, doc);
+
+        // TODO: Write syntetic information
+
+    }
+
+    static void writeExecutableMember(JsonGenerator g, ExecutableMemberDoc doc)
+            throws IOException {
+
+        // Write member basics
+        writeMember(g, doc);
+
+
+        // Write parameters
+        g.writeArrayFieldStart("parameters");
+        for (final Parameter p : doc.parameters())
+            writeMethodParameter(g, p, doc.paramTags());
+        g.writeEndArray();
+
+        // Write throws declarations
+        g.writeArrayFieldStart("throws");
+        for (final Type t : doc.thrownExceptionTypes()) {
+            writeThrow(g, t, doc.throwsTags());
+        }
+        g.writeEndArray();
+
+        // Is var args?
+        g.writeObjectField("varargs", doc.isVarArgs());
     }
 
     static void writeTypeBasics(JsonGenerator g, Type t)
@@ -305,12 +386,12 @@ public class JsonDoclet {
         }
 
         // Type name
-        g.writeObjectField("name", t.typeName());
-
-        if (writeAnnotatedType(g, t.asAnnotatedType()))
-            return;
+        g.writeObjectField("class", t.typeName());
 
         if (writeAnnotationType(g, t.asAnnotationTypeDoc()))
+            return;
+
+        if (writeAnnotatedType(g, t.asAnnotatedType()))
             return;
 
         if (writeParametrizedType(g, t.asParameterizedType()))
@@ -401,16 +482,31 @@ public class JsonDoclet {
         throw new UnsupportedOperationException("Annotation type not supported yet: " + t);
     }
 
-    static boolean writeAnnotationType(JsonGenerator g, AnnotationTypeDoc d)
-    throws IOException {
-        if (d == null)
+    static boolean writeAnnotationType(JsonGenerator g, AnnotationTypeDoc a)
+            throws IOException {
+        if (a == null)
             return false;
 
-        throw new UnsupportedOperationException("");
+        g.writeObjectField("type", "annotation");
+
+        // Write package
+        g.writeObjectField("package", a.containingPackage().name());
+
+        // Write elements
+        g.writeArrayFieldStart("elements");
+        for (final AnnotationTypeElementDoc e : a.elements()) {
+            g.writeStartObject();
+            g.writeObjectField("name", e.name());
+            g.writeObjectField("defaultValue", e.defaultValue().toString());
+            g.writeEndObject();
+        }
+        g.writeEndArray();
+
+        return true;
     }
 
     static boolean writeClassBasics(JsonGenerator g, ClassDoc c)
-            throws IOException{
+            throws IOException {
         return writeClassBasics(g, c, true);
     }
 
@@ -429,6 +525,8 @@ public class JsonDoclet {
             g.writeObjectField("type", "error");
         } else if (c.isOrdinaryClass()) {
             g.writeObjectField("type", "class");
+        } else if (c.isAnnotationType()) {
+            g.writeObjectField("type", "annotation");
         } else {
             throw new IllegalArgumentException("Unsupported class: " + c);
         }
@@ -437,7 +535,7 @@ public class JsonDoclet {
         g.writeObjectField("package", c.containingPackage().name());
 
         // Only write generics if we are asked to
-        if (generics) {
+        if (generics && !c.isAnnotationType()) {
             // Write generics parameters
             g.writeArrayFieldStart("genericTypes");
             for (TypeVariable t : c.typeParameters()) {
@@ -449,6 +547,30 @@ public class JsonDoclet {
         }
 
         return true;
+    }
+
+    static void writeAnnotationDesc(JsonGenerator g, AnnotationDesc a)
+            throws IOException {
+        g.writeStartObject();
+
+        final AnnotationTypeDoc t = a.annotationType();
+
+        // Annotation information
+        g.writeObjectFieldStart("annotation");
+        writeTypeBasics(g, t);
+        g.writeEndObject();
+
+        // Write elements
+        g.writeArrayFieldStart("elements");
+        for (final AnnotationDesc.ElementValuePair v : a.elementValues()) {
+            g.writeStartObject();
+            g.writeObjectField("name", v.element().name());
+            g.writeObjectField("value", v.value().value());
+            g.writeEndObject();
+        }
+        g.writeEndArray();
+
+        g.writeEndObject();
     }
 
     static <T> T get(T[] elements, int i) {
